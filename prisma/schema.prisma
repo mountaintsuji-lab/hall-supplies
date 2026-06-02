@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Hall {
+  id        String           @id
+  name      String
+  shortName String
+  settings  HallSkuSetting[]
+  events    InventoryEvent[]
+}
+
+model Sku {
+  id        String           @id
+  name      String
+  unit      String
+  category  String
+  imageEmoji String?
+  settings  HallSkuSetting[]
+  events    InventoryEvent[]
+}
+
+model HallSkuSetting {
+  hallId     String
+  skuId      String
+  parLevel   Int
+  currentQty Int      @default(0)
+  version    Int      @default(0)
+  hall       Hall     @relation(fields: [hallId], references: [id])
+  sku        Sku      @relation(fields: [skuId], references: [id])
+
+  @@id([hallId, skuId])
+}
+
+enum InventoryEventType {
+  COUNT
+  ORDER
+  RECEIVE
+  CANCEL
+}
+
+enum OrderStatus {
+  REQUESTED
+  RECEIVED
+  CANCELLED
+}
+
+model InventoryEvent {
+  id         String             @id @default(cuid())
+  hallId     String
+  skuId      String
+  type       InventoryEventType
+  countedQty Int
+  parLevel   Int
+  orderedQty Int?
+  status     OrderStatus?
+  createdAt  DateTime           @default(now())
+  hall       Hall               @relation(fields: [hallId], references: [id])
+  sku        Sku                @relation(fields: [skuId], references: [id])
+
+  @@index([hallId, skuId, createdAt])
+  @@index([hallId, skuId, type, status])
+}
