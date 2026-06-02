@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { isReadOnlyDeploy } from "@/lib/inventory-fallback-data";
 
 export type ConfirmCountResult =
   | {
@@ -16,6 +16,7 @@ export type ConfirmCountResult =
   | { ok: false; error: string };
 
 async function getPendingQty(hallId: string, skuId: string): Promise<number> {
+  const { prisma } = await import("@/lib/prisma");
   const result = await prisma.inventoryEvent.aggregate({
     where: {
       hallId,
@@ -34,9 +35,19 @@ export async function confirmCount(
   countedQty: number,
   expectedVersion: number,
 ): Promise<ConfirmCountResult> {
+  if (isReadOnlyDeploy()) {
+    return {
+      ok: false,
+      error:
+        "Vercel デモ環境は閲覧専用です。現数の保存はローカル（npm run dev）でお試しください。",
+    };
+  }
+
   if (!Number.isInteger(countedQty) || countedQty < 0) {
     return { ok: false, error: "現数は0以上の整数で入力してください" };
   }
+
+  const { prisma } = await import("@/lib/prisma");
 
   const setting = await prisma.hallSkuSetting.findUnique({
     where: { hallId_skuId: { hallId, skuId } },
@@ -106,8 +117,7 @@ export async function confirmCount(
 
   revalidatePath("/");
 
-  const newPending =
-    orderQty >= 1 ? pendingQty + orderQty : pendingQty;
+  const newPending = orderQty >= 1 ? pendingQty + orderQty : pendingQty;
 
   return {
     ok: true,
@@ -125,6 +135,9 @@ export async function previewOrderQty(
   skuId: string,
   countedQty: number,
 ): Promise<{ orderQty: number; pendingQty: number; parLevel: number } | null> {
+  if (isReadOnlyDeploy()) return null;
+
+  const { prisma } = await import("@/lib/prisma");
   const setting = await prisma.hallSkuSetting.findUnique({
     where: { hallId_skuId: { hallId, skuId } },
   });

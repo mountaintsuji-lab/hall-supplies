@@ -42,6 +42,7 @@ type ListItem =
 
 type SuppliesMainMockupProps = {
   data: InventoryPageData;
+  readOnly?: boolean;
 };
 
 function isSkuShortage(sku: SkuSettingRow): boolean {
@@ -189,7 +190,10 @@ function StatBlock({
   );
 }
 
-export function SuppliesMainMockup({ data }: SuppliesMainMockupProps) {
+export function SuppliesMainMockup({
+  data,
+  readOnly = false,
+}: SuppliesMainMockupProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -359,7 +363,13 @@ export function SuppliesMainMockup({ data }: SuppliesMainMockupProps) {
     INDIVIDUAL_ITEMS.filter((i) => i.hallId === selectedHallId).length;
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-slate-50 text-slate-900">
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-50 text-slate-900">
+      {readOnly ? (
+        <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
+          Vercel デモ（閲覧専用）— 現数の保存はローカルで動作します
+        </div>
+      ) : null}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* ペイン1: 拠点 */}
       <aside className="flex w-64 shrink-0 flex-col border-r border-slate-800 bg-slate-900 text-slate-100">
         <div className="border-b border-slate-800 px-4 py-5">
@@ -852,6 +862,8 @@ export function SuppliesMainMockup({ data }: SuppliesMainMockupProps) {
           </div>
         </div>
       </aside>
+
+      </div>
 
       {/* 確認モーダル */}
       <Modal
