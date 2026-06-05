@@ -376,10 +376,11 @@ export function SuppliesMainMockup({
           <div className="flex items-center gap-2">
             <Building2 className="size-5 text-slate-300" />
             <div>
-              <p className="text-xs font-medium uppercase tracking-wider text-slate-400">
-                Hall Supplies
+              <p className="text-[10px] font-medium tracking-wider text-slate-400">
+                備品発注・管理ツール
               </p>
-              <h1 className="text-sm font-semibold text-white">拠点選択</h1>
+              <h1 className="text-sm font-semibold text-white">ポチっとな</h1>
+              <p className="text-xs text-slate-500">拠点選択</p>
             </div>
           </div>
         </div>

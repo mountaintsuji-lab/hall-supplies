@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "ホール備品 — 在庫連動・発注",
-  description: "在庫と連動した発注候補の4ペイン管理",
+  title: "ポチっとな — 備品発注・管理ツール",
+  description: "備品の現数入力と発注を、4ペインで直観的に行うツール",
 };
 
 export default function RootLayout({
