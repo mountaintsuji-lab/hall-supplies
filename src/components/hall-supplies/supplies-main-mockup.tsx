@@ -31,6 +31,7 @@ import {
 import {
   calcOrderQty,
   formatEventText,
+  type InventoryPageBanner,
   type InventoryPageData,
   type SkuSettingRow,
 } from "@/lib/inventory-types";
@@ -43,6 +44,7 @@ type ListItem =
 type SuppliesMainMockupProps = {
   data: InventoryPageData;
   readOnly?: boolean;
+  banner?: InventoryPageBanner;
 };
 
 function isSkuShortage(sku: SkuSettingRow): boolean {
@@ -193,6 +195,7 @@ function StatBlock({
 export function SuppliesMainMockup({
   data,
   readOnly = false,
+  banner = "none",
 }: SuppliesMainMockupProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -314,7 +317,7 @@ export function SuppliesMainMockup({
   }
 
   function handleCountTap(n: number) {
-    if (!selectedSku) return;
+    if (!selectedSku || readOnly) return;
     setPendingCount(n);
     setConfirmOpen(true);
   }
@@ -364,7 +367,11 @@ export function SuppliesMainMockup({
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-50 text-slate-900">
-      {readOnly ? (
+      {banner === "db-error" ? (
+        <div className="shrink-0 border-b border-red-200 bg-red-50 px-4 py-2 text-center text-xs text-red-900">
+          データベースに接続できません。表示はサンプルデータです。現数は保存できません。
+        </div>
+      ) : banner === "no-database-url" ? (
         <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
           閲覧専用 — DATABASE_URL を設定すると現数を保存できます
         </div>
@@ -814,7 +821,7 @@ export function SuppliesMainMockup({
                         key={n}
                         variant="outline"
                         size="sm"
-                        disabled={isPending}
+                        disabled={isPending || readOnly}
                         onClick={() => handleCountTap(n)}
                         className={cn(
                           "h-10 tabular-nums font-semibold",

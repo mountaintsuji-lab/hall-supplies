@@ -35,6 +35,15 @@ export type InventoryPageData = {
   events: InventoryEventRow[];
 };
 
+/** ページ読み込み時のデータソース（バナー表示用） */
+export type InventoryPageBanner = "none" | "no-database-url" | "db-error";
+
+export type InventoryPageLoadResult = {
+  data: InventoryPageData;
+  readOnly: boolean;
+  banner: InventoryPageBanner;
+};
+
 export function formatEventText(
   event: InventoryEventRow,
   unit: string,
