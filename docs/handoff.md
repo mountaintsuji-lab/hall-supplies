@@ -2,7 +2,7 @@
 
 > 作業の引き継ぎ用メモ。**仕様の正**は [`requirements-decisions.md`](./requirements-decisions.md) を参照。
 >
-> 最終更新: 2026-06-02
+> 最終更新: 2026-06-12
 
 ---
 
@@ -21,7 +21,7 @@
 | 製品名 | **備品発注・管理ツール「ポチっとな」**（旧名: 葬祭備品管理 / Hall Supplies） |
 | 目的 | 葬儀式場の備品を 4ペインで管理。SKU は現数入力→自動発注、個体は QR 管理 |
 | 技術 | Next.js 16 + shadcn/ui + Prisma 7 + Neon Postgres |
-| 講義 | AI-Driven School 月次課題。第5・6回の芯は **4ペインUI・GitHub/Vercel 公開**。Prisma/現数発注は **4ヶ月目の先取り** |
+| 講義 | AI-Driven School 月次課題。第5・6回=4ペインUI・Vercel公開。**第7回=Neon 永続化（完了）** |
 
 ---
 
@@ -31,7 +31,8 @@
 |------|------|
 | ローカル | `c:\Users\mount\OneDrive\Desktop\src2\hall-supplies\` |
 | Git | https://github.com/mountaintsuji-lab/hall-supplies |
-| Vercel（閲覧デモ） | https://hall-supplies.vercel.app |
+| Vercel（本番） | https://hall-supplies.vercel.app |
+| 本番 DB 検証スクショ | `docs/screenshots/verification-2026-06-05/` |
 | 図解（講義提出） | https://diagram-hall-supplies-4pane.surge.sh |
 | 要件・決定 | `docs/requirements-decisions.md` |
 | 図解 HTML（編集元） | 親 `src2` の `.claude/skills/creating-visual-explainers/output/hall-supplies-4pane.html` |
@@ -45,16 +46,22 @@
 ```powershell
 cd c:\Users\mount\OneDrive\Desktop\src2\hall-supplies
 npm install
+# 初回のみ: Vercel から環境変数を取得（または .env.example を参考に DATABASE_URL を設定）
+npx vercel link --project hall-supplies --yes
+npx vercel env pull .env.local --yes
+# .env に DATABASE_URL をコピー（Prisma CLI 用）
+npm run db:setup   # 初回のみ（migrate + seed）
 npm run dev
 ```
 
 | 環境 | 現数保存 | 備考 |
 |------|----------|------|
-| ローカル `npm run dev` | ✅ | `DATABASE_URL`（Neon）必須 |
-| Vercel 本番 | ✅ | Neon 接続後。未設定時は閲覧専用フォールバック |
+| ローカル `npm run dev` | ✅ | Neon（`DATABASE_URL`）と本番 DB を共有 |
+| Vercel 本番 | ✅ | Neon `neon-aqua-yacht` 接続済み |
+| `DATABASE_URL` 未設定時 | ❌ | 静的フォールバック表示（閲覧専用バナーあり） |
 
-ビルドコマンド: `prisma generate` → `migrate deploy` → `next build`  
-初回 DB 投入: `npm run db:setup`（migrate + seed、手動1回）
+ビルド: `prisma generate` → `migrate deploy` → `next build`（**seed は含まない** — 本番データ消失防止）  
+初回 DB 投入: `npm run db:setup`（手動1回のみ）
 
 ---
 
@@ -78,7 +85,10 @@ npm run dev
 | `src/components/hall-supplies/supplies-main-mockup.tsx` | メイン UI（4ペイン） |
 | `src/app/actions/inventory.ts` | `confirmCount` Server Action |
 | `src/lib/inventory-queries.ts` | ページデータ取得 |
-| `src/lib/inventory-fallback-data.ts` | Vercel 閲覧専用データ |
+| `src/lib/inventory-fallback-data.ts` | `DATABASE_URL` 未設定時のフォールバック |
+| `src/lib/prisma.ts` | Prisma 7 + `@prisma/adapter-pg` |
+| `scripts/check-db.ts` | Neon のデータ件数確認 |
+| `scripts/verify-production.mjs` | 本番 URL で永続化検証 + スクショ |
 | `src/lib/individual-items.ts` | 個体の静的データ |
 | `prisma/schema.prisma` | DB スキーマ |
 | `prisma/seed.ts` | 初期データ |
@@ -92,53 +102,54 @@ npm run dev
 | 4ペイン UI | ✅ |
 | SKU 現数グリッド・確認モーダル | ✅ |
 | SKU 詳細（現数/定数/発注中） | ✅ |
-| Prisma + Neon Postgres | 🔶 コード移行済。`DATABASE_URL` 接続待ち |
+| Prisma + Neon Postgres | ✅ |
 | `confirmCount` + InventoryEvent | ✅ COUNT / ORDER |
 | 個体 | 🔶 静的モック |
 | RECEIVE / CANCEL UI | ❌ |
 | 認証・権限 | ❌ |
-| Vercel 本番での永続化 | 🔶 Neon Connect Project 後に有効 |
-| 本番 DB | Neon `neon-aqua-yacht`（Vercel Storage に追加済） |
+| Vercel 本番での永続化 | ✅ 2026-06-12 検証済み（現数 12→14、リロード後も維持） |
+| 本番 DB | Neon `neon-aqua-yacht`（Vercel Storage、pooler URL） |
 
 ---
 
 ## 7. Git 状態
 
 ```
-branch: main
-ahead of origin/main by 1 commit（0716595 — push 未確認）
-未コミット:
-  - src/app/layout.tsx（タイトル → ポチっとな）
-  - src/components/hall-supplies/supplies-main-mockup.tsx（ブランド名）
+branch: main（origin/main と同期済み）
+未コミット（作業中）:
+  - docs/handoff.md, docs/requirements-decisions.md（第7回ドキュメント整合）
+  - docs/screenshots/, scripts/（本番検証）
+  - package.json（playwright devDep）
 ```
 
 直近コミット:
 
+- `001e845` feat: Neon Postgres へ移行し Vercel 本番で現数を永続化
+- `59b6aa0` docs: 引き継ぎドキュメントを追加し、製品名をポチっとなに変更
 - `0716595` docs: 全体決定一覧を更新
-- `0048219` Vercel 閲覧専用フォールバック
-- `b6333e2` 現数入力ベースの自動発注と Prisma 永続化
 
 ---
 
 ## 8. 次にやりそうなこと
 
-1. Vercel で Neon を **hall-supplies** に Connect Project → `DATABASE_URL` を `.env` に設定 → `npm run db:setup`
-2. commit + push → Vercel 再デプロイ → 本番で現数保存を確認
-3. 個体の Prisma 化 + QR スキャン
-4. RECEIVE（入庫確定）UI
-5. 認証・権限（現場 / 管理）
-6. `requirements-decisions.md` の表記を「ポチっとな」に統一
+1. ~~本番 DB 接続・永続化確認~~ ✅（`docs/screenshots/verification-2026-06-05/`）
+2. ~~ドキュメント整合（handoff / requirements-decisions）~~ ← 本作業
+3. ~~**図解の第7回更新**~~ ✅ SECTION 5 追加・surge 再デプロイ
+4. 個体の Prisma 化 + QR スキャン
+5. RECEIVE（入庫確定）UI
+6. 認証・権限（現場 / 管理）
 
 ---
 
 ## 9. 図解（講義提出）
 
-| SECTION | 内容 |
-|---------|------|
-| 1 | 実スクリーンショット + 4ペイン説明 |
-| 2 | 解決する課題（3視点・高齢者向け直観性） |
-| 3 | 工夫①〜④（④=SKUと個体の両方） |
-| 4 | 苦戦①欲張りすぎ ②理解不足 |
+| SECTION | 内容 | 状態 |
+|---------|------|------|
+| 1 | 実スクリーンショット + 4ペイン説明 | ✅（第3回） |
+| 2 | 解決する課題（3視点・高齢者向け直観性） | ✅ |
+| 3 | 工夫①〜④（④=SKUと個体の両方） | ✅ |
+| 4 | 苦戦①欲張りすぎ ②理解不足 | ✅ |
+| **5** | **第7回: Neon 永続化・保存先の理由・検証スクショ** | ✅ 2026-06-12 |
 
 再デプロイ:
 

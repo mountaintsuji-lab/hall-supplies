@@ -2,7 +2,7 @@
 
 > グリル（要件深掘り）で合意した内容の整理。実装仕様書ではなく、**意思決定の索引**として使う。
 >
-> 最終更新: 2026-06-02
+> 最終更新: 2026-06-12
 
 ---
 
@@ -45,7 +45,7 @@
 | 項目 | 決定 |
 |------|------|
 | UI構造 | **4ペイン**（式場 → 一覧 → 詳細 → 操作）。左→右で全体→詳細 |
-| 技術 | **Next.js × shadcn/ui**（Prisma + SQLite は4ヶ月目第一歩としてローカル実装中） |
+| 技術 | **Next.js 16 × shadcn/ui × Prisma 7 × Neon Postgres**（第7回課題で本番永続化） |
 | 追跡モデル | **個体管理とSKUが混在** |
 | SKUの日常操作 | **棚の現数を入力 → 自動発注**（+/- による入出庫ではない） |
 | 個体の日常操作 | **QRスキャン**（読み取り → サーバが個体を一意判定） |
@@ -237,7 +237,7 @@
 
 - [ ] 高リスク**再認証**の方式（パスワード / PIN）
 - [ ] ラベル**印刷手段**（PDF / ラベルプリンタ）
-- [ ] 本番 DB（Vercel 向け Postgres 等への移行）
+- [x] 本番 DB（Neon Postgres へ移行 — 2026-06-12 完了）
 - [ ] **カテゴリ初期リスト**の具体名
 - [ ] 個体データの Prisma 化タイミング
 
@@ -251,13 +251,13 @@
 | 個体 | 🔶 モック | 静的データ、QR は UI のみ |
 | SKU 現数グリッド | ✅ | ペイン4 |
 | SKU 詳細（現数/定数/発注中） | ✅ | ペイン3 |
-| Prisma + SQLite | ✅ | ローカルのみ |
+| Prisma + Neon Postgres | ✅ | `@prisma/adapter-pg`、ローカルも本番 DB 共有 |
 | `confirmCount` Server Action | ✅ | 楽観ロック付き |
 | InventoryEvent | ✅ | COUNT / ORDER |
 | RECEIVE / CANCEL UI | ❌ | スキーマのみ |
-| 認証 | ❌ | |
-| Vercel 本番での永続化 | ❌ | 閲覧専用フォールバック（§15） |
-| Vercel 閲覧デモ | ✅ | `inventory-fallback-data.ts` |
+| 認証 | ❌ | v1 外。公開 URL は誰でも現数変更可能 |
+| Vercel 本番での永続化 | ✅ | 2026-06-12 検証済み |
+| DB 未接続時フォールバック | ✅ | `DATABASE_URL` 未設定時のみ静的データ（§15） |
 
 ---
 
@@ -289,12 +289,25 @@ flowchart LR
 |------|------|
 | リポジトリ | `mountaintsuji-lab/hall-supplies`（単独 Git） |
 | 公開 | **Vercel**（GitHub `main` push で自動デプロイ） |
-| ローカル DB | **SQLite** + Prisma 7（`HallSkuSetting`, `InventoryEvent`） |
-| Vercel 本番 DB | **SQLite は使わない**（サーバーレス非対応） |
-| Vercel 本番表示 | `VERCEL=1` 時は **seed 同等の静的データ**（閲覧専用） |
-| 現数保存 | **ローカル `npm run dev` のみ**（本番 URL では不可） |
-| ビルド | `prisma generate` → `migrate deploy` → `db seed` → `next build` |
-| Prisma 設定 | `DATABASE_URL` 未設定時は `file:./prisma/dev.db` に fallback |
+| 本番 URL | https://hall-supplies.vercel.app |
+| DB | **Neon Postgres**（Vercel Storage `neon-aqua-yacht`） |
+| 接続 | 環境変数 `DATABASE_URL`（pooler URL、`sslmode=require`） |
+| ローカル開発 | 本番と **同一 Neon DB** を `DATABASE_URL` で共有 |
+| 現数保存 | **ローカル・本番とも** Server Action → Neon に書き込み |
+| ビルド | `prisma generate` → `migrate deploy` → `next build` |
+| 初回 seed | `npm run db:setup`（**手動1回**。ビルド時 seed は入れない） |
+| Prisma クライアント | Prisma 7 + `@prisma/adapter-pg`（`src/lib/prisma.ts`） |
+| 未接続時 | `DATABASE_URL` 未設定 → 静的フォールバック + 閲覧専用バナー |
+
+### データの保存先（第7回）
+
+| データ | 保存先 | 理由 |
+|--------|--------|------|
+| 現数・定数・発注履歴 | **Neon（Postgres）** | 複数端末・本番 URL で共有する運用データ |
+| 仕様・設計の決定 | **Git（Markdown）** | AI が読める。変更理由を残す |
+| 個体デモ | **コード内 TS** | v1 外。画面モック用 |
+
+検証記録: `docs/screenshots/verification-2026-06-05/`
 
 ---
 
@@ -356,3 +369,4 @@ orderQty   = max(0, parLevel - countedQty - pendingQty)
 | 2026-05-20 | グリル合意内容を初版作成（ロケーション別 SKU モデル） |
 | 2026-06-02 | §7 を現数入力→自動発注に差し替え。InventoryEvent 一本化。§13・§15・付録追加 |
 | 2026-06-02 | Vercel 閲覧専用フォールバック、ビルド設定（prisma.config fallback） |
+| 2026-06-12 | SQLite → Neon Postgres 移行。§13・§15 更新。本番永続化検証済み |
