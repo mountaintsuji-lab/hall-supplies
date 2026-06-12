@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { HALLS, PILOT_HALL_ID } from "../src/lib/halls";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
@@ -13,13 +14,7 @@ async function main() {
   await prisma.sku.deleteMany();
   await prisma.hall.deleteMany();
 
-  const halls = [
-    { id: "ichinomiya", name: "一宮斎場", shortName: "一宮" },
-    { id: "minokamo", name: "美濃加茂斎場", shortName: "美濃加茂" },
-    { id: "kani", name: "可児斎場", shortName: "可児" },
-  ];
-
-  for (const hall of halls) {
+  for (const hall of HALLS) {
     await prisma.hall.create({ data: hall });
   }
 
@@ -59,9 +54,9 @@ async function main() {
   }
 
   const settings = [
-    { hallId: "ichinomiya", skuId: "sku-1", parLevel: 20, currentQty: 12 },
-    { hallId: "ichinomiya", skuId: "sku-2", parLevel: 15, currentQty: 28 },
-    { hallId: "ichinomiya", skuId: "sku-3", parLevel: 24, currentQty: 6 },
+    { hallId: PILOT_HALL_ID, skuId: "sku-1", parLevel: 20, currentQty: 12 },
+    { hallId: PILOT_HALL_ID, skuId: "sku-2", parLevel: 15, currentQty: 28 },
+    { hallId: PILOT_HALL_ID, skuId: "sku-3", parLevel: 24, currentQty: 6 },
     { hallId: "minokamo", skuId: "sku-4", parLevel: 20, currentQty: 30 },
   ];
 
@@ -72,7 +67,7 @@ async function main() {
   await prisma.inventoryEvent.createMany({
     data: [
       {
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-1",
         type: "ORDER",
         countedQty: 10,
@@ -82,7 +77,7 @@ async function main() {
         createdAt: new Date("2026-05-10T09:00:00"),
       },
       {
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-1",
         type: "COUNT",
         countedQty: 12,
@@ -90,7 +85,7 @@ async function main() {
         createdAt: new Date("2026-05-12T11:05:00"),
       },
       {
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-3",
         type: "COUNT",
         countedQty: 6,

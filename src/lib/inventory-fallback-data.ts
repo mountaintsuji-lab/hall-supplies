@@ -1,16 +1,13 @@
+import { HALLS, PILOT_HALL_ID } from "@/lib/halls";
 import type { InventoryPageData } from "@/lib/inventory-types";
 
 /** Vercel 本番用：build 時 seed と同内容の読み取り専用データ */
 export function getFallbackInventoryPageData(): InventoryPageData {
   return {
-    halls: [
-      { id: "ichinomiya", name: "一宮斎場", shortName: "一宮" },
-      { id: "minokamo", name: "美濃加茂斎場", shortName: "美濃加茂" },
-      { id: "kani", name: "可児斎場", shortName: "可児" },
-    ],
+    halls: HALLS.map((h) => ({ ...h })),
     skuSettings: [
       {
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-1",
         name: "短寸線香",
         unit: "箱",
@@ -22,7 +19,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
         pendingQty: 10,
       },
       {
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-2",
         name: "HDMIケーブル（3m）",
         unit: "本",
@@ -34,7 +31,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
         pendingQty: 0,
       },
       {
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-3",
         name: "会葬御礼ハンドタオル",
         unit: "箱",
@@ -61,7 +58,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
     events: [
       {
         id: "evt-fallback-1",
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-1",
         type: "ORDER",
         countedQty: 10,
@@ -72,7 +69,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
       },
       {
         id: "evt-fallback-2",
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-1",
         type: "COUNT",
         countedQty: 12,
@@ -83,7 +80,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
       },
       {
         id: "evt-fallback-3",
-        hallId: "ichinomiya",
+        hallId: PILOT_HALL_ID,
         skuId: "sku-3",
         type: "COUNT",
         countedQty: 6,

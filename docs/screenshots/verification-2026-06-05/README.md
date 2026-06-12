@@ -8,7 +8,7 @@
 | Neon seed | ✅ Hall 3 / Sku 4 / HallSkuSetting 4 / InventoryEvent 3 |
 | 閲覧専用バナー | ✅ 非表示（DB 接続あり） |
 | 本番 URL | https://hall-supplies.vercel.app |
-| 操作 | 一宮斎場 × 短寸線香の現数を **12 → 14** に変更 |
+| 操作 | 山手 × 短寸線香の現数を **12 → 14** に変更（当時は旧式場名） |
 | リロード後 | ✅ **14** のまま表示 |
 
 ## スクリーンショット

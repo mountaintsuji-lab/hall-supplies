@@ -16,7 +16,7 @@ export type IndividualItem = {
 export const INDIVIDUAL_ITEMS: IndividualItem[] = [
   {
     id: "ind-1",
-    hallId: "ichinomiya",
+    hallId: "yamate",
     name: "電子焼香机",
     category: "会場設営",
     status: "away",
@@ -30,7 +30,7 @@ export const INDIVIDUAL_ITEMS: IndividualItem[] = [
   },
   {
     id: "ind-2",
-    hallId: "ichinomiya",
+    hallId: "yamate",
     name: "演台（黒・可動式）",
     category: "会場設営",
     status: "in_stock",
@@ -51,14 +51,14 @@ export const INDIVIDUAL_ITEMS: IndividualItem[] = [
   },
   {
     id: "ind-4",
-    hallId: "kani",
+    hallId: "nishikani",
     name: "焼香台（木製・大）",
     category: "会場設営",
     status: "away",
     serial: "SK-2018-0003",
     purchaseDate: "2018-09-01",
     awayReason: "客先貸出",
-    awayDestination: "可児市 A様ご葬儀",
+    awayDestination: "西可児エリア A様ご葬儀",
     returnDueDate: "2026-05-25",
     imageEmoji: "⛩️",
   },

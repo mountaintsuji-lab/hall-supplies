@@ -91,6 +91,7 @@ npm run dev
 | `scripts/verify-production.mjs` | 本番 URL で永続化検証 + スクショ |
 | `src/lib/individual-items.ts` | 個体の静的データ |
 | `prisma/schema.prisma` | DB スキーマ |
+| `src/lib/halls.ts` | 式場マスタ（7拠点・パイロット=山手） |
 | `prisma/seed.ts` | 初期データ |
 
 ---

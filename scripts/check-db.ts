@@ -15,11 +15,11 @@ async function main() {
     prisma.inventoryEvent.count(),
   ]);
 
-  const ichinomiyaSku1 = await prisma.hallSkuSetting.findUnique({
-    where: { hallId_skuId: { hallId: "ichinomiya", skuId: "sku-1" } },
+  const yamateSku1 = await prisma.hallSkuSetting.findUnique({
+    where: { hallId_skuId: { hallId: "yamate", skuId: "sku-1" } },
   });
 
-  console.log(JSON.stringify({ hallCount, skuCount, settingCount, eventCount, ichinomiyaSku1 }, null, 2));
+  console.log(JSON.stringify({ hallCount, skuCount, settingCount, eventCount, yamateSku1 }, null, 2));
 }
 
 main()
