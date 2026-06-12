@@ -39,7 +39,7 @@ export async function confirmCount(
     return {
       ok: false,
       error:
-        "Vercel デモ環境は閲覧専用です。現数の保存はローカル（npm run dev）でお試しください。",
+        "DATABASE_URL が未設定のため保存できません。Neon の接続情報を .env に設定してください。",
     };
   }
 

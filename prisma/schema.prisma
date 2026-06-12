@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Hall {
@@ -15,13 +15,13 @@ model Hall {
 }
 
 model Sku {
-  id        String           @id
-  name      String
-  unit      String
-  category  String
+  id         String           @id
+  name       String
+  unit       String
+  category   String
   imageEmoji String?
-  settings  HallSkuSetting[]
-  events    InventoryEvent[]
+  settings   HallSkuSetting[]
+  events     InventoryEvent[]
 }
 
 model HallSkuSetting {

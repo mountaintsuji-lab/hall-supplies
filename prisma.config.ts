@@ -1,9 +1,5 @@
 import "dotenv/config";
-import { defineConfig } from "prisma/config";
-
-// env() は未設定時に即 throw するため、Vercel ビルドでは fallback を使う
-const databaseUrl =
-  process.env.DATABASE_URL ?? "file:./prisma/dev.db";
+import { defineConfig, env } from "prisma/config";
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -12,6 +8,6 @@ export default defineConfig({
     seed: "tsx prisma/seed.ts",
   },
   datasource: {
-    url: databaseUrl,
+    url: env("DATABASE_URL"),
   },
 });

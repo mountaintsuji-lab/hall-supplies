@@ -60,7 +60,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
     ],
     events: [
       {
-        id: "evt-order-1",
+        id: "evt-fallback-1",
         hallId: "ichinomiya",
         skuId: "sku-1",
         type: "ORDER",
@@ -71,7 +71,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
         createdAt: "2026-05-10T09:00:00.000Z",
       },
       {
-        id: "evt-count-1",
+        id: "evt-fallback-2",
         hallId: "ichinomiya",
         skuId: "sku-1",
         type: "COUNT",
@@ -82,7 +82,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
         createdAt: "2026-05-12T11:05:00.000Z",
       },
       {
-        id: "evt-count-2",
+        id: "evt-fallback-3",
         hallId: "ichinomiya",
         skuId: "sku-3",
         type: "COUNT",
@@ -96,6 +96,7 @@ export function getFallbackInventoryPageData(): InventoryPageData {
   };
 }
 
+/** DATABASE_URL 未設定時のみ閲覧専用（Neon 接続後は読み書き可能） */
 export function isReadOnlyDeploy(): boolean {
-  return process.env.VERCEL === "1";
+  return !process.env.DATABASE_URL;
 }

@@ -366,7 +366,7 @@ export function SuppliesMainMockup({
     <div className="flex h-screen w-full flex-col overflow-hidden bg-slate-50 text-slate-900">
       {readOnly ? (
         <div className="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-2 text-center text-xs text-amber-900">
-          Vercel デモ（閲覧専用）— 現数の保存はローカルで動作します
+          閲覧専用 — DATABASE_URL を設定すると現数を保存できます
         </div>
       ) : null}
       <div className="flex min-h-0 flex-1 overflow-hidden">

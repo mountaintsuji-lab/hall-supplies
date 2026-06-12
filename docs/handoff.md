@@ -20,7 +20,7 @@
 |------|------|
 | 製品名 | **備品発注・管理ツール「ポチっとな」**（旧名: 葬祭備品管理 / Hall Supplies） |
 | 目的 | 葬儀式場の備品を 4ペインで管理。SKU は現数入力→自動発注、個体は QR 管理 |
-| 技術 | Next.js 16 + shadcn/ui + Prisma 7 + SQLite（ローカル） |
+| 技術 | Next.js 16 + shadcn/ui + Prisma 7 + Neon Postgres |
 | 講義 | AI-Driven School 月次課題。第5・6回の芯は **4ペインUI・GitHub/Vercel 公開**。Prisma/現数発注は **4ヶ月目の先取り** |
 
 ---
@@ -50,10 +50,11 @@ npm run dev
 
 | 環境 | 現数保存 | 備考 |
 |------|----------|------|
-| ローカル `npm run dev` | ✅ | SQLite + Prisma |
-| Vercel 本番 | ❌ | `VERCEL=1` 時は閲覧専用フォールバック |
+| ローカル `npm run dev` | ✅ | `DATABASE_URL`（Neon）必須 |
+| Vercel 本番 | ✅ | Neon 接続後。未設定時は閲覧専用フォールバック |
 
-ビルドコマンド: `prisma generate` → `migrate deploy` → `db seed` → `next build`
+ビルドコマンド: `prisma generate` → `migrate deploy` → `next build`  
+初回 DB 投入: `npm run db:setup`（migrate + seed、手動1回）
 
 ---
 
@@ -91,13 +92,13 @@ npm run dev
 | 4ペイン UI | ✅ |
 | SKU 現数グリッド・確認モーダル | ✅ |
 | SKU 詳細（現数/定数/発注中） | ✅ |
-| Prisma + SQLite（ローカル） | ✅ |
+| Prisma + Neon Postgres | 🔶 コード移行済。`DATABASE_URL` 接続待ち |
 | `confirmCount` + InventoryEvent | ✅ COUNT / ORDER |
 | 個体 | 🔶 静的モック |
 | RECEIVE / CANCEL UI | ❌ |
 | 認証・権限 | ❌ |
-| Vercel 本番での永続化 | ❌ |
-| 本番 DB（Postgres 等） | ❌ 未決 |
+| Vercel 本番での永続化 | 🔶 Neon Connect Project 後に有効 |
+| 本番 DB | Neon `neon-aqua-yacht`（Vercel Storage に追加済） |
 
 ---
 
@@ -121,8 +122,8 @@ ahead of origin/main by 1 commit（0716595 — push 未確認）
 
 ## 8. 次にやりそうなこと
 
-1. タイトル変更（ポチっとな）を commit + push → Vercel 反映
-2. 本番 DB 移行（Neon/Postgres）— Vercel で現数保存を動かすには必須
+1. Vercel で Neon を **hall-supplies** に Connect Project → `DATABASE_URL` を `.env` に設定 → `npm run db:setup`
+2. commit + push → Vercel 再デプロイ → 本番で現数保存を確認
 3. 個体の Prisma 化 + QR スキャン
 4. RECEIVE（入庫確定）UI
 5. 認証・権限（現場 / 管理）
