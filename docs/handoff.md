@@ -92,7 +92,11 @@ npm run dev
 | `src/lib/individual-items.ts` | 個体の静的データ |
 | `prisma/schema.prisma` | DB スキーマ |
 | `src/lib/halls.ts` | 式場マスタ（7拠点・パイロット=山手） |
-| `prisma/seed.ts` | 初期データ |
+| `src/data/yamate-skus.ts` | 山手消耗品 SKU（Excel から自動生成・149件） |
+| `src/lib/yamate/parse-excel.ts` | 山手ホール.xlsm パーサ |
+| `scripts/generate-yamate-skus.ts` | Excel → `yamate-skus.ts` 生成 |
+| `scripts/import-par-levels.ts` | Excel「数」列から定数だけ一括更新 |
+| `prisma/seed.ts` | 初期データ（山手149 SKU・仮定数10） |
 
 ---
 
@@ -108,7 +112,8 @@ npm run dev
 | 個体 | 🔶 静的モック |
 | RECEIVE / CANCEL UI | ❌ |
 | 認証・権限 | ❌ |
-| Vercel 本番での永続化 | ✅ 2026-06-12 検証済み（現数 12→14、リロード後も維持） |
+| Vercel 本番での永続化 | ✅ 2026-06-12 検証済み |
+| 山手 SKU 実データ（消耗品） | ✅ 149件・仮定数10・ID安定化済み |
 | 本番 DB | Neon `neon-aqua-yacht`（Vercel Storage、pooler URL） |
 
 ---
@@ -133,9 +138,9 @@ branch: main（origin/main と同期済み）
 
 ## 8. 次にやりそうなこと
 
-1. ~~本番 DB 接続・永続化確認~~ ✅（`docs/screenshots/verification-2026-06-05/`）
-2. ~~ドキュメント整合（handoff / requirements-decisions）~~ ← 本作業
-3. ~~**図解の第7回更新**~~ ✅ SECTION 5 追加・surge 再デプロイ
+1. ~~本番 DB 接続・永続化確認~~ ✅
+2. ~~山手 SKU 実データ（消耗品・仮定数）~~ ✅
+3. Excel「数」列が埋まったら `npm run import:par-levels -- <xlsmパス>` で定数一括更新
 4. 個体の Prisma 化 + QR スキャン
 5. RECEIVE（入庫確定）UI
 6. 認証・権限（現場 / 管理）

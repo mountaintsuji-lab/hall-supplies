@@ -8,6 +8,7 @@ import {
   History,
   Package,
   QrCode,
+  Search,
   ShoppingCart,
   X,
 } from "lucide-react";
@@ -22,6 +23,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
   INDIVIDUAL_HISTORY,
@@ -71,6 +73,42 @@ function formatDate(iso?: string) {
 
 function formatEventTime(iso: string) {
   return iso.slice(0, 16).replace("T", " ");
+}
+
+function listItemName(entry: ListItem): string {
+  return entry.kind === "sku" ? entry.sku.name : entry.item.name;
+}
+
+function listItemCategory(entry: ListItem): string {
+  return entry.kind === "sku" ? entry.sku.category : entry.item.category;
+}
+
+function buildCategoryOrder(items: ListItem[]): Map<string, number> {
+  const order = new Map<string, number>();
+  for (const entry of items) {
+    const category = listItemCategory(entry);
+    if (!order.has(category)) {
+      order.set(category, order.size);
+    }
+  }
+  return order;
+}
+
+function compareListItems(
+  a: ListItem,
+  b: ListItem,
+  categoryOrder: Map<string, number>,
+): number {
+  const catA = categoryOrder.get(listItemCategory(a)) ?? Number.MAX_SAFE_INTEGER;
+  const catB = categoryOrder.get(listItemCategory(b)) ?? Number.MAX_SAFE_INTEGER;
+  if (catA !== catB) return catA - catB;
+  return listItemName(a).localeCompare(listItemName(b), "ja");
+}
+
+function matchesSearch(entry: ListItem, query: string): boolean {
+  if (!query) return true;
+  const haystack = `${listItemName(entry)} ${listItemCategory(entry)}`.toLowerCase();
+  return haystack.includes(query.toLowerCase());
 }
 
 function ToggleSwitch({
@@ -212,6 +250,8 @@ export function SuppliesMainMockup({
   const [selectedHallId, setSelectedHallId] = useState(halls[0]?.id ?? "");
   const [selectedKey, setSelectedKey] = useState(defaultItemId);
   const [shortageOnly, setShortageOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
@@ -237,13 +277,47 @@ export function SuppliesMainMockup({
     return [...skus, ...inds];
   }, [hallSkus, hallIndividuals]);
 
+  const categoryOrder = useMemo(() => buildCategoryOrder(listItems), [listItems]);
+
+  const categories = useMemo(
+    () =>
+      [...categoryOrder.entries()]
+        .sort((a, b) => a[1] - b[1])
+        .map(([category]) => category),
+    [categoryOrder],
+  );
+
   const visibleItems = useMemo(() => {
-    if (!shortageOnly) return listItems;
-    return listItems.filter((entry) => {
-      if (entry.kind === "sku") return isSkuShortage(entry.sku);
-      return entry.item.status === "away";
-    });
-  }, [listItems, shortageOnly]);
+    const trimmedQuery = searchQuery.trim();
+    let items = listItems;
+
+    if (shortageOnly) {
+      items = items.filter((entry) => {
+        if (entry.kind === "sku") return isSkuShortage(entry.sku);
+        return entry.item.status === "away";
+      });
+    }
+
+    if (categoryFilter) {
+      items = items.filter(
+        (entry) => listItemCategory(entry) === categoryFilter,
+      );
+    }
+
+    if (trimmedQuery) {
+      items = items.filter((entry) => matchesSearch(entry, trimmedQuery));
+    }
+
+    return [...items].sort((a, b) => compareListItems(a, b, categoryOrder));
+  }, [listItems, shortageOnly, categoryFilter, searchQuery, categoryOrder]);
+
+  const emptyListMessage = useMemo(() => {
+    if (shortageOnly) return "在庫不足の備品はありません";
+    if (searchQuery.trim() || categoryFilter) {
+      return "条件に一致する備品はありません";
+    }
+    return "備品がありません";
+  }, [shortageOnly, searchQuery, categoryFilter]);
 
   const selectedEntry = useMemo(() => {
     const found = listItems.find((entry) => {
@@ -304,6 +378,8 @@ export function SuppliesMainMockup({
 
   function selectHall(id: string) {
     setSelectedHallId(id);
+    setSearchQuery("");
+    setCategoryFilter("");
     const firstSku = skuSettings.find((s) => s.hallId === id);
     const firstInd = INDIVIDUAL_ITEMS.find((i) => i.hallId === id);
     if (firstSku) setSelectedKey(`sku:${firstSku.skuId}`);
@@ -444,6 +520,42 @@ export function SuppliesMainMockup({
               {visibleItems.length} 件
             </Badge>
           </div>
+          <div className="mt-3 space-y-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-slate-400" />
+              <Input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="名称で検索…"
+                aria-label="備品名称で検索"
+                className="h-8 bg-slate-50 pl-8 pr-8 text-sm"
+              />
+              {searchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="検索をクリア"
+                  className="absolute top-1/2 right-2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              aria-label="カテゴリで絞り込み"
+              className="h-8 w-full rounded-lg border border-input bg-slate-50 px-2.5 text-sm text-slate-700 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <option value="">すべてのカテゴリ</option>
+              {categories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="mt-3">
             <ToggleSwitch
               checked={shortageOnly}
@@ -457,9 +569,7 @@ export function SuppliesMainMockup({
           {visibleItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
               <Package className="size-8 text-slate-300" />
-              <p className="text-sm text-slate-500">
-                在庫不足の備品はありません
-              </p>
+              <p className="text-sm text-slate-500">{emptyListMessage}</p>
             </div>
           ) : (
             <table className="w-full text-sm">

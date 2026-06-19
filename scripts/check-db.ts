@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { YAMATE_SKUS } from "../src/data/yamate-skus";
 
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL,
@@ -15,11 +16,12 @@ async function main() {
     prisma.inventoryEvent.count(),
   ]);
 
-  const yamateSku1 = await prisma.hallSkuSetting.findUnique({
-    where: { hallId_skuId: { hallId: "yamate", skuId: "sku-1" } },
+  const sampleSkuId = YAMATE_SKUS[0]?.id ?? "";
+  const yamateSample = await prisma.hallSkuSetting.findUnique({
+    where: { hallId_skuId: { hallId: "yamate", skuId: sampleSkuId } },
   });
 
-  console.log(JSON.stringify({ hallCount, skuCount, settingCount, eventCount, yamateSku1 }, null, 2));
+  console.log(JSON.stringify({ hallCount, skuCount, settingCount, eventCount, yamateSample }, null, 2));
 }
 
 main()

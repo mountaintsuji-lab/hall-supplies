@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { YAMATE_SKUS } from "../src/data/yamate-skus";
 import { HALLS, PILOT_HALL_ID } from "../src/lib/halls";
 
 const adapter = new PrismaPg({
@@ -18,87 +19,30 @@ async function main() {
     await prisma.hall.create({ data: hall });
   }
 
-  const skus = [
-    {
-      id: "sku-1",
-      name: "短寸線香",
-      unit: "箱",
-      category: "消耗品",
-      imageEmoji: "🕯️",
-    },
-    {
-      id: "sku-2",
-      name: "HDMIケーブル（3m）",
-      unit: "本",
-      category: "音響・映像",
-      imageEmoji: "🔌",
-    },
-    {
-      id: "sku-3",
-      name: "会葬御礼ハンドタオル",
-      unit: "箱",
-      category: "消耗品",
-      imageEmoji: "🧻",
-    },
-    {
-      id: "sku-4",
-      name: "短寸線香",
-      unit: "箱",
-      category: "消耗品",
-      imageEmoji: "🕯️",
-    },
-  ];
+  await prisma.sku.createMany({
+    data: YAMATE_SKUS.map((sku) => ({
+      id: sku.id,
+      name: sku.name,
+      unit: sku.unit,
+      category: sku.category,
+      imageEmoji: sku.imageEmoji,
+    })),
+  });
 
-  for (const sku of skus) {
-    await prisma.sku.create({ data: sku });
-  }
-
-  const settings = [
-    { hallId: PILOT_HALL_ID, skuId: "sku-1", parLevel: 20, currentQty: 12 },
-    { hallId: PILOT_HALL_ID, skuId: "sku-2", parLevel: 15, currentQty: 28 },
-    { hallId: PILOT_HALL_ID, skuId: "sku-3", parLevel: 24, currentQty: 6 },
-    { hallId: "minokamo", skuId: "sku-4", parLevel: 20, currentQty: 30 },
-  ];
-
-  for (const setting of settings) {
-    await prisma.hallSkuSetting.create({ data: setting });
-  }
-
-  await prisma.inventoryEvent.createMany({
-    data: [
-      {
-        hallId: PILOT_HALL_ID,
-        skuId: "sku-1",
-        type: "ORDER",
-        countedQty: 10,
-        parLevel: 20,
-        orderedQty: 10,
-        status: "REQUESTED",
-        createdAt: new Date("2026-05-10T09:00:00"),
-      },
-      {
-        hallId: PILOT_HALL_ID,
-        skuId: "sku-1",
-        type: "COUNT",
-        countedQty: 12,
-        parLevel: 20,
-        createdAt: new Date("2026-05-12T11:05:00"),
-      },
-      {
-        hallId: PILOT_HALL_ID,
-        skuId: "sku-3",
-        type: "COUNT",
-        countedQty: 6,
-        parLevel: 24,
-        createdAt: new Date("2026-05-01T16:40:00"),
-      },
-    ],
+  await prisma.hallSkuSetting.createMany({
+    data: YAMATE_SKUS.map((sku) => ({
+      hallId: PILOT_HALL_ID,
+      skuId: sku.id,
+      parLevel: sku.parLevel,
+      currentQty: 0,
+    })),
   });
 }
 
 main()
   .then(async () => {
     await prisma.$disconnect();
+    console.log(`Seeded ${YAMATE_SKUS.length} SKUs for ${PILOT_HALL_ID}`);
   })
   .catch(async (error) => {
     console.error(error);
