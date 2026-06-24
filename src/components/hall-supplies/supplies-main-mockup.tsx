@@ -7,12 +7,13 @@ import {
   Building2,
   History,
   Package,
+  PackageCheck,
   QrCode,
   Search,
   ShoppingCart,
   X,
 } from "lucide-react";
-import { confirmCount } from "@/app/actions/inventory";
+import { confirmCount, confirmReceive } from "@/app/actions/inventory";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +34,7 @@ import {
 import {
   calcOrderQty,
   formatEventText,
+  type InventoryEventRow,
   type InventoryPageBanner,
   type InventoryPageData,
   type SkuSettingRow,
@@ -254,6 +256,7 @@ export function SuppliesMainMockup({
   const [categoryFilter, setCategoryFilter] = useState("");
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -346,7 +349,14 @@ export function SuppliesMainMockup({
 
   const itemHistory = useMemo(() => {
     if (selectedIndividual) {
-      return INDIVIDUAL_HISTORY.filter((h) => h.itemId === selectedIndividual.id);
+      return INDIVIDUAL_HISTORY.filter((h) => h.itemId === selectedIndividual.id).map(
+        (h) => ({
+          id: h.id,
+          at: h.at,
+          text: h.text,
+          kind: "other" as const,
+        }),
+      );
     }
     if (selectedSku) {
       return events
@@ -358,10 +368,21 @@ export function SuppliesMainMockup({
           id: e.id,
           at: formatEventTime(e.createdAt),
           text: formatEventText(e, selectedSku.unit),
+          kind: e.type,
         }));
     }
     return [];
   }, [selectedIndividual, selectedSku, events]);
+
+  const lastReceive = useMemo(() => {
+    if (!selectedSku) return null;
+    return events.find(
+      (e) =>
+        e.hallId === selectedSku.hallId &&
+        e.skuId === selectedSku.skuId &&
+        e.type === "RECEIVE",
+    );
+  }, [selectedSku, events]);
 
   const gridMax = selectedSku
     ? Math.max(selectedSku.parLevel, 20)
@@ -428,6 +449,32 @@ export function SuppliesMainMockup({
           : `現数 ${result.currentQty}${unit} を記録しました（発注不要）`,
       );
       handleConfirmClose();
+      router.refresh();
+    });
+  }
+
+  function handleReceiveSubmit() {
+    if (!selectedSku) return;
+
+    startTransition(async () => {
+      setActionError(null);
+      const result = await confirmReceive(
+        selectedSku.hallId,
+        selectedSku.skuId,
+        selectedSku.version,
+      );
+
+      if (!result.ok) {
+        setActionError(result.error);
+        setReceiveOpen(false);
+        return;
+      }
+
+      const unit = selectedSku.unit;
+      setActionMessage(
+        `入庫確定: ${result.receivedQty}${unit} を反映しました（現数 ${result.currentQty}${unit}）`,
+      );
+      setReceiveOpen(false);
       router.refresh();
     });
   }
@@ -854,6 +901,15 @@ export function SuppliesMainMockup({
                             {selectedSku.unit}
                           </Badge>
                         ) : null}
+                        {lastReceive ? (
+                          <Badge
+                            variant="outline"
+                            className="border-emerald-300 bg-emerald-50 text-emerald-800"
+                          >
+                            <PackageCheck className="mr-1 size-3" />
+                            最終入庫 {formatEventTime(lastReceive.createdAt)}
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -910,7 +966,11 @@ export function SuppliesMainMockup({
         <div className="shrink-0 border-b border-slate-200 bg-white px-4 py-4">
           <h2 className="text-sm font-semibold text-slate-900">操作</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            {selectedSku ? "現数入力 · 自動発注" : "スキャン操作"}
+            {selectedSku
+              ? selectedSku.pendingQty > 0
+                ? "現数入力 · 入庫確定"
+                : "現数入力 · 自動発注"
+              : "スキャン操作"}
           </p>
         </div>
 
@@ -918,6 +978,34 @@ export function SuppliesMainMockup({
           <div className="space-y-4">
             {selectedSku ? (
               <>
+                {selectedSku.pendingQty > 0 ? (
+                  <>
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3">
+                      <div className="flex items-start gap-2">
+                        <PackageCheck className="mt-0.5 size-4 shrink-0 text-emerald-600" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-emerald-900">
+                            入庫待ち {selectedSku.pendingQty}
+                            {selectedSku.unit}
+                          </p>
+                          <p className="mt-1 text-xs text-emerald-800">
+                            届いた荷物を在庫に反映すると、発注中が解消され現数が増えます。
+                          </p>
+                          <Button
+                            className="mt-3 h-9 w-full bg-emerald-600 text-white hover:bg-emerald-700"
+                            disabled={isPending || readOnly}
+                            onClick={() => setReceiveOpen(true)}
+                          >
+                            <PackageCheck className="size-4" />
+                            入庫を確定
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                    <Separator />
+                  </>
+                ) : null}
+
                 <div>
                   <Label className="text-xs text-slate-500">
                     棚の残り数をタップ
@@ -1046,6 +1134,65 @@ export function SuppliesMainMockup({
           </div>
         ) : null}
       </Modal>
+
+      <Modal
+        open={receiveOpen}
+        title="入庫を確定"
+        description="届いた荷物を在庫に反映します"
+        onClose={() => setReceiveOpen(false)}
+      >
+        {selectedSku && selectedSku.pendingQty > 0 ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <StatBlock
+                label="入庫数"
+                value={selectedSku.pendingQty}
+                unit={selectedSku.unit}
+                accent="green"
+              />
+              <StatBlock
+                label="入庫前"
+                value={selectedSku.currentQty}
+                unit={selectedSku.unit}
+              />
+              <StatBlock
+                label="入庫後"
+                value={selectedSku.currentQty + selectedSku.pendingQty}
+                unit={selectedSku.unit}
+                accent="green"
+              />
+            </div>
+
+            <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+              発注中の <strong>{selectedSku.pendingQty}</strong>
+              {selectedSku.unit} を入庫し、現数を{" "}
+              <strong>{selectedSku.currentQty}</strong>
+              {selectedSku.unit} →{" "}
+              <strong>
+                {selectedSku.currentQty + selectedSku.pendingQty}
+              </strong>
+              {selectedSku.unit} に更新します。
+            </p>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setReceiveOpen(false)}
+                disabled={isPending}
+              >
+                キャンセル
+              </Button>
+              <Button
+                className="bg-emerald-600 hover:bg-emerald-700"
+                disabled={isPending}
+                onClick={handleReceiveSubmit}
+              >
+                {isPending ? "反映中…" : "入庫確定"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }
@@ -1053,7 +1200,12 @@ export function SuppliesMainMockup({
 function HistoryCard({
   items,
 }: {
-  items: { id: string; at: string; text: string }[];
+  items: {
+    id: string;
+    at: string;
+    text: string;
+    kind: InventoryEventRow["type"] | "other";
+  }[];
 }) {
   return (
     <Card className="border-slate-200 shadow-sm">
@@ -1071,12 +1223,35 @@ function HistoryCard({
             {items.map((h) => (
               <li
                 key={h.id}
-                className="flex gap-3 border-l-2 border-slate-200 pl-3"
+                className={cn(
+                  "flex gap-3 border-l-2 pl-3",
+                  h.kind === "RECEIVE"
+                    ? "border-emerald-400 bg-emerald-50/50 py-1"
+                    : h.kind === "ORDER"
+                      ? "border-blue-300"
+                      : "border-slate-200",
+                )}
               >
                 <time className="shrink-0 text-xs tabular-nums text-slate-400">
                   {h.at}
                 </time>
-                <span className="text-sm text-slate-700">{h.text}</span>
+                <span
+                  className={cn(
+                    "text-sm",
+                    h.kind === "RECEIVE"
+                      ? "font-medium text-emerald-800"
+                      : "text-slate-700",
+                  )}
+                >
+                  {h.kind === "RECEIVE" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <PackageCheck className="size-3.5 shrink-0" />
+                      {h.text}
+                    </span>
+                  ) : (
+                    h.text
+                  )}
+                </span>
               </li>
             ))}
           </ul>

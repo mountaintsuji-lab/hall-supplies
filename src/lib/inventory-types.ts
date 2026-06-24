@@ -54,7 +54,7 @@ export function formatEventText(
     case "ORDER":
       return `${event.orderedQty}${unit} 発注（現数 ${event.countedQty}）`;
     case "RECEIVE":
-      return `入庫 ${event.orderedQty ?? 0}${unit}`;
+      return `入庫確定 +${event.orderedQty ?? 0}${unit}（現数 ${event.countedQty}${unit}）`;
     case "CANCEL":
       return `発注取消 ${event.orderedQty ?? 0}${unit}`;
     default:
