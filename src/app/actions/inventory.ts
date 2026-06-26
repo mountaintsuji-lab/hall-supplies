@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isReadOnlyDeploy } from "@/lib/inventory-fallback-data";
+import { requireSession } from "@/lib/auth";
 
 export type ConfirmCountResult =
   | {
@@ -21,6 +22,23 @@ export type ConfirmReceiveResult =
       receivedQty: number;
       currentQty: number;
       pendingQty: number;
+      version: number;
+    }
+  | { ok: false; error: string };
+
+export type ConfirmCancelResult =
+  | {
+      ok: true;
+      cancelledQty: number;
+      pendingQty: number;
+      version: number;
+    }
+  | { ok: false; error: string };
+
+export type UpdateParLevelResult =
+  | {
+      ok: true;
+      parLevel: number;
       version: number;
     }
   | { ok: false; error: string };
@@ -45,6 +63,11 @@ export async function confirmCount(
   countedQty: number,
   expectedVersion: number,
 ): Promise<ConfirmCountResult> {
+  const auth = await requireSession("field");
+  if ("error" in auth) {
+    return { ok: false, error: auth.error };
+  }
+
   if (isReadOnlyDeploy()) {
     return {
       ok: false,
@@ -168,6 +191,11 @@ export async function confirmReceive(
   skuId: string,
   expectedVersion: number,
 ): Promise<ConfirmReceiveResult> {
+  const auth = await requireSession("field");
+  if ("error" in auth) {
+    return { ok: false, error: auth.error };
+  }
+
   if (isReadOnlyDeploy()) {
     return {
       ok: false,
@@ -260,6 +288,170 @@ export async function confirmReceive(
         error: "他の端末で更新されました。画面を再読込してください",
       };
     }
+    throw error;
+  }
+}
+
+export async function confirmCancel(
+  hallId: string,
+  skuId: string,
+  expectedVersion: number,
+): Promise<ConfirmCancelResult> {
+  const auth = await requireSession("admin");
+  if ("error" in auth) {
+    return { ok: false, error: auth.error };
+  }
+
+  if (isReadOnlyDeploy()) {
+    return {
+      ok: false,
+      error:
+        "DATABASE_URL が未設定のため保存できません。Neon の接続情報を .env に設定してください。",
+    };
+  }
+
+  const { prisma } = await import("@/lib/prisma");
+
+  const setting = await prisma.hallSkuSetting.findUnique({
+    where: { hallId_skuId: { hallId, skuId } },
+  });
+
+  if (!setting) {
+    return { ok: false, error: "式場×SKUの設定が見つかりません" };
+  }
+
+  if (setting.version !== expectedVersion) {
+    return {
+      ok: false,
+      error: "他の端末で更新されました。画面を再読込してください",
+    };
+  }
+
+  const pendingOrders = await prisma.inventoryEvent.findMany({
+    where: { hallId, skuId, type: "ORDER", status: "REQUESTED" },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const cancelQty = pendingOrders.reduce(
+    (sum, order) => sum + (order.orderedQty ?? 0),
+    0,
+  );
+
+  if (cancelQty < 1) {
+    return { ok: false, error: "取消対象の発注がありません" };
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.hallSkuSetting.updateMany({
+        where: { hallId, skuId, version: expectedVersion },
+        data: { version: { increment: 1 } },
+      });
+
+      if (updated.count === 0) {
+        throw new Error("VERSION_CONFLICT");
+      }
+
+      await tx.inventoryEvent.updateMany({
+        where: { hallId, skuId, type: "ORDER", status: "REQUESTED" },
+        data: { status: "CANCELLED" },
+      });
+
+      await tx.inventoryEvent.create({
+        data: {
+          hallId,
+          skuId,
+          type: "CANCEL",
+          countedQty: setting.currentQty,
+          parLevel: setting.parLevel,
+          orderedQty: cancelQty,
+        },
+      });
+    });
+
+    revalidatePath("/");
+
+    return {
+      ok: true,
+      cancelledQty: cancelQty,
+      pendingQty: 0,
+      version: expectedVersion + 1,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message === "VERSION_CONFLICT") {
+      return {
+        ok: false,
+        error: "他の端末で更新されました。画面を再読込してください",
+      };
+    }
+    throw error;
+  }
+}
+
+export async function updateParLevel(
+  hallId: string,
+  skuId: string,
+  newParLevel: number,
+  expectedVersion: number,
+): Promise<UpdateParLevelResult> {
+  const auth = await requireSession("admin");
+  if ("error" in auth) {
+    return { ok: false, error: auth.error };
+  }
+
+  if (isReadOnlyDeploy()) {
+    return {
+      ok: false,
+      error:
+        "DATABASE_URL が未設定のため保存できません。Neon の接続情報を .env に設定してください。",
+    };
+  }
+
+  if (!Number.isInteger(newParLevel) || newParLevel < 0) {
+    return { ok: false, error: "定数は0以上の整数で入力してください" };
+  }
+
+  const { prisma } = await import("@/lib/prisma");
+
+  const setting = await prisma.hallSkuSetting.findUnique({
+    where: { hallId_skuId: { hallId, skuId } },
+  });
+
+  if (!setting) {
+    return { ok: false, error: "式場×SKUの設定が見つかりません" };
+  }
+
+  if (setting.version !== expectedVersion) {
+    return {
+      ok: false,
+      error: "他の端末で更新されました。画面を再読込してください",
+    };
+  }
+
+  try {
+    const updated = await prisma.hallSkuSetting.updateMany({
+      where: { hallId, skuId, version: expectedVersion },
+      data: {
+        parLevel: newParLevel,
+        version: { increment: 1 },
+      },
+    });
+
+    if (updated.count === 0) {
+      return {
+        ok: false,
+        error: "他の端末で更新されました。画面を再読込してください",
+      };
+    }
+
+    revalidatePath("/");
+
+    return {
+      ok: true,
+      parLevel: newParLevel,
+      version: expectedVersion + 1,
+    };
+  } catch (error) {
     throw error;
   }
 }

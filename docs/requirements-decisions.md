@@ -2,7 +2,7 @@
 
 > グリル（要件深掘り）で合意した内容の整理。実装仕様書ではなく、**意思決定の索引**として使う。
 >
-> 最終更新: 2026-06-12
+> 最終更新: 2026-06-19
 
 ---
 
@@ -77,7 +77,7 @@
 - **QRの発行・再発行**
 - 在庫外理由のうち管理限定分（式場間・廃棄予定など）
 - **全社ビュー**（返却超過一覧・定数未満一覧）
-- 発注の **入庫確定**（`RECEIVE` イベント）— v1 UI は後回し可
+- 発注の **入庫確定**（`RECEIVE` イベント）— ✅ v1 UI 実装済み（2026-06-19）
 
 ### 現場ロール
 
@@ -193,8 +193,8 @@
 | 方針 | **履歴は InventoryEvent に一本化**（追記のみ） |
 | `COUNT` | 現数記録（発注0のとき） |
 | `ORDER` | 発注（`orderedQty`, `status=REQUESTED`） |
-| `RECEIVE` | 入庫確定（発注中 → 在庫反映）— v1 UI 後回し可 |
-| `CANCEL` | 発注取消 |
+| `RECEIVE` | 入庫確定（発注中 → 在庫反映）— ✅ UI 実装済み |
+| `CANCEL` | 発注取消 — ✅ 管理 UI 実装済み |
 | 記録項目 | `hallId`, `skuId`, `countedQty`, `parLevel`（確定時点）, `orderedQty`（ORDER 時）, `createdAt` |
 
 ---
@@ -226,8 +226,8 @@
 - SKU の +/- クイック変更・数量調整モーダル
 - 1Dバーコード読取
 - 画面QRでの日常スキャン（SKU）
-- 認証・ログイン
-- 入庫確定 UI（`RECEIVE` はスキーマのみ）
+- ~~認証・ログイン~~ → **パスワード認証実装済み**（`AUTH_PASSWORD` 設定時のみ有効）
+- ~~入庫確定 UI~~ → ✅ 実装済み
 - 祝日・営業日カレンダー
 - （任意）メール等のプッシュ通知
 
@@ -251,11 +251,18 @@
 | 個体 | 🔶 モック | 静的データ、QR は UI のみ |
 | SKU 現数グリッド | ✅ | ペイン4 |
 | SKU 詳細（現数/定数/発注中） | ✅ | ペイン3 |
+| 名称検索・カテゴリ絞り込み | ✅ | ペイン2 |
+| 山手149 SKU | ✅ | DB投入済み・仮定数10 |
 | Prisma + Neon Postgres | ✅ | `@prisma/adapter-pg`、ローカルも本番 DB 共有 |
 | `confirmCount` Server Action | ✅ | 楽観ロック付き |
-| InventoryEvent | ✅ | COUNT / ORDER |
-| RECEIVE / CANCEL UI | ❌ | スキーマのみ |
-| 認証 | ❌ | v1 外。公開 URL は誰でも現数変更可能 |
+| `confirmReceive` Server Action | ✅ | 一括入庫（部分入庫は未対応） |
+| `confirmCancel` Server Action | ✅ | 管理ロールのみ |
+| `updateParLevel` Server Action | ✅ | 管理ロールのみ |
+| InventoryEvent | ✅ | COUNT / ORDER / RECEIVE / CANCEL |
+| RECEIVE UI | ✅ | ペイン4・履歴ハイライト |
+| CANCEL UI | ✅ | 管理のみ・ペイン4 |
+| 定数編集 UI | ✅ | 管理のみ・ペイン3 |
+| 認証 | ✅ | `AUTH_PASSWORD` 設定時 middleware + ログイン。未設定時は従来どおり公開 |
 | Vercel 本番での永続化 | ✅ | 2026-06-12 検証済み |
 | DB 未接続時フォールバック | ✅ | `DATABASE_URL` 未設定時のみ静的データ（§15） |
 
@@ -298,6 +305,7 @@ flowchart LR
 | 初回 seed | `npm run db:setup`（**手動1回**。ビルド時 seed は入れない） |
 | Prisma クライアント | Prisma 7 + `@prisma/adapter-pg`（`src/lib/prisma.ts`） |
 | 未接続時 | `DATABASE_URL` 未設定 → 静的フォールバック + 閲覧専用バナー |
+| 認証 | `AUTH_PASSWORD` / `ADMIN_PASSWORD` / `AUTH_SECRET`（§3 参照）。未設定時はログイン不要 |
 
 ### データの保存先（第7回）
 
@@ -370,3 +378,4 @@ orderQty   = max(0, parLevel - countedQty - pendingQty)
 | 2026-06-02 | §7 を現数入力→自動発注に差し替え。InventoryEvent 一本化。§13・§15・付録追加 |
 | 2026-06-02 | Vercel 閲覧専用フォールバック、ビルド設定（prisma.config fallback） |
 | 2026-06-12 | SQLite → Neon Postgres 移行。§13・§15 更新。本番永続化検証済み |
+| 2026-06-19 | RECEIVE UI・CANCEL UI・定数編集 UI・パスワード認証を実装。§13 更新 |

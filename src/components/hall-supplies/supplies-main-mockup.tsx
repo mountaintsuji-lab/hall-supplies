@@ -4,16 +4,26 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
+  Ban,
   Building2,
   History,
+  LogOut,
   Package,
   PackageCheck,
+  Pencil,
   QrCode,
   Search,
   ShoppingCart,
   X,
 } from "lucide-react";
-import { confirmCount, confirmReceive } from "@/app/actions/inventory";
+import { logout } from "@/app/actions/auth";
+import {
+  confirmCancel,
+  confirmCount,
+  confirmReceive,
+  updateParLevel,
+} from "@/app/actions/inventory";
+import type { UserRole } from "@/lib/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,6 +59,8 @@ type SuppliesMainMockupProps = {
   data: InventoryPageData;
   readOnly?: boolean;
   banner?: InventoryPageBanner;
+  userRole?: UserRole;
+  authEnabled?: boolean;
 };
 
 function isSkuShortage(sku: SkuSettingRow): boolean {
@@ -236,6 +248,8 @@ export function SuppliesMainMockup({
   data,
   readOnly = false,
   banner = "none",
+  userRole = "field",
+  authEnabled = false,
 }: SuppliesMainMockupProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -257,9 +271,14 @@ export function SuppliesMainMockup({
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [receiveOpen, setReceiveOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [parLevelOpen, setParLevelOpen] = useState(false);
+  const [editParLevel, setEditParLevel] = useState("");
   const [pendingCount, setPendingCount] = useState<number | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const isAdmin = userRole === "admin";
 
   const hallSkus = useMemo(
     () => skuSettings.filter((s) => s.hallId === selectedHallId),
@@ -479,6 +498,73 @@ export function SuppliesMainMockup({
     });
   }
 
+  function handleCancelSubmit() {
+    if (!selectedSku) return;
+
+    startTransition(async () => {
+      setActionError(null);
+      const result = await confirmCancel(
+        selectedSku.hallId,
+        selectedSku.skuId,
+        selectedSku.version,
+      );
+
+      if (!result.ok) {
+        setActionError(result.error);
+        setCancelOpen(false);
+        return;
+      }
+
+      const unit = selectedSku.unit;
+      setActionMessage(
+        `発注取消: ${result.cancelledQty}${unit} の発注を取り消しました`,
+      );
+      setCancelOpen(false);
+      router.refresh();
+    });
+  }
+
+  function openParLevelEdit() {
+    if (!selectedSku) return;
+    setEditParLevel(String(selectedSku.parLevel));
+    setParLevelOpen(true);
+  }
+
+  function handleParLevelSubmit() {
+    if (!selectedSku) return;
+    const newLevel = Number.parseInt(editParLevel, 10);
+    if (!Number.isInteger(newLevel) || newLevel < 0) {
+      setActionError("定数は0以上の整数で入力してください");
+      return;
+    }
+
+    startTransition(async () => {
+      setActionError(null);
+      const result = await updateParLevel(
+        selectedSku.hallId,
+        selectedSku.skuId,
+        newLevel,
+        selectedSku.version,
+      );
+
+      if (!result.ok) {
+        setActionError(result.error);
+        setParLevelOpen(false);
+        return;
+      }
+
+      setActionMessage(`定数を ${result.parLevel}${selectedSku.unit} に更新しました`);
+      setParLevelOpen(false);
+      router.refresh();
+    });
+  }
+
+  function handleLogout() {
+    startTransition(async () => {
+      await logout();
+    });
+  }
+
   function handleScanStart() {
     setScanMessage("カメラ起動（モック）— QRを読み取ってください");
     window.setTimeout(() => setScanMessage(null), 3200);
@@ -551,7 +637,29 @@ export function SuppliesMainMockup({
           </ul>
         </nav>
         <div className="border-t border-slate-800 px-4 py-3 text-xs text-slate-500">
-          現数発注 · v0.2
+          <div className="flex items-center justify-between gap-2">
+            <span>現数発注 · v0.3</span>
+            {authEnabled ? (
+              <Badge
+                variant="outline"
+                className="border-slate-600 text-[10px] text-slate-400"
+              >
+                {isAdmin ? "管理" : "現場"}
+              </Badge>
+            ) : null}
+          </div>
+          {authEnabled ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-2 h-7 w-full justify-start px-0 text-slate-400 hover:bg-white/5 hover:text-slate-200"
+              onClick={handleLogout}
+              disabled={isPending}
+            >
+              <LogOut className="size-3.5" />
+              ログアウト
+            </Button>
+          ) : null}
         </div>
       </aside>
 
@@ -924,11 +1032,23 @@ export function SuppliesMainMockup({
                         isSkuShortage(selectedSku) ? "amber" : "default"
                       }
                     />
-                    <StatBlock
-                      label="定数"
-                      value={selectedSku.parLevel}
-                      unit={selectedSku.unit}
-                    />
+                    <div className="relative">
+                      <StatBlock
+                        label="定数"
+                        value={selectedSku.parLevel}
+                        unit={selectedSku.unit}
+                      />
+                      {isAdmin && !readOnly ? (
+                        <button
+                          type="button"
+                          onClick={openParLevelEdit}
+                          className="absolute top-1 right-1 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
+                          aria-label="定数を編集"
+                        >
+                          <Pencil className="size-3" />
+                        </button>
+                      ) : null}
+                    </div>
                     <StatBlock
                       label="発注中"
                       value={selectedSku.pendingQty}
@@ -999,6 +1119,17 @@ export function SuppliesMainMockup({
                             <PackageCheck className="size-4" />
                             入庫を確定
                           </Button>
+                          {isAdmin ? (
+                            <Button
+                              variant="outline"
+                              className="mt-2 h-9 w-full border-red-200 text-red-700 hover:bg-red-50"
+                              disabled={isPending || readOnly}
+                              onClick={() => setCancelOpen(true)}
+                            >
+                              <Ban className="size-4" />
+                              発注を取消
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -1193,6 +1324,81 @@ export function SuppliesMainMockup({
           </div>
         ) : null}
       </Modal>
+
+      <Modal
+        open={cancelOpen}
+        title="発注を取消"
+        description="発注中の数量をすべて取り消します"
+        onClose={() => setCancelOpen(false)}
+      >
+        {selectedSku && selectedSku.pendingQty > 0 ? (
+          <div className="space-y-4">
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+              発注中の <strong>{selectedSku.pendingQty}</strong>
+              {selectedSku.unit} を取消します。現数は変わりません。
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setCancelOpen(false)}
+                disabled={isPending}
+              >
+                戻る
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={isPending}
+                onClick={handleCancelSubmit}
+              >
+                {isPending ? "取消中…" : "取消確定"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={parLevelOpen}
+        title="定数を編集"
+        description="この式場×SKUの目標在庫数を変更します"
+        onClose={() => setParLevelOpen(false)}
+      >
+        {selectedSku ? (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="par-level">定数（{selectedSku.unit}）</Label>
+              <Input
+                id="par-level"
+                type="number"
+                min={0}
+                value={editParLevel}
+                onChange={(e) => setEditParLevel(e.target.value)}
+                disabled={isPending}
+              />
+            </div>
+            <p className="text-xs text-slate-500">
+              現在: {selectedSku.parLevel}
+              {selectedSku.unit} → 変更後の発注数は次回の現数確定時に再計算されます。
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setParLevelOpen(false)}
+                disabled={isPending}
+              >
+                キャンセル
+              </Button>
+              <Button
+                className="bg-slate-900 hover:bg-slate-800"
+                disabled={isPending}
+                onClick={handleParLevelSubmit}
+              >
+                {isPending ? "保存中…" : "保存"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }
@@ -1227,9 +1433,11 @@ function HistoryCard({
                   "flex gap-3 border-l-2 pl-3",
                   h.kind === "RECEIVE"
                     ? "border-emerald-400 bg-emerald-50/50 py-1"
-                    : h.kind === "ORDER"
-                      ? "border-blue-300"
-                      : "border-slate-200",
+                    : h.kind === "CANCEL"
+                      ? "border-red-300 bg-red-50/50 py-1"
+                      : h.kind === "ORDER"
+                        ? "border-blue-300"
+                        : "border-slate-200",
                 )}
               >
                 <time className="shrink-0 text-xs tabular-nums text-slate-400">
@@ -1240,12 +1448,19 @@ function HistoryCard({
                     "text-sm",
                     h.kind === "RECEIVE"
                       ? "font-medium text-emerald-800"
-                      : "text-slate-700",
+                      : h.kind === "CANCEL"
+                        ? "font-medium text-red-800"
+                        : "text-slate-700",
                   )}
                 >
                   {h.kind === "RECEIVE" ? (
                     <span className="inline-flex items-center gap-1">
                       <PackageCheck className="size-3.5 shrink-0" />
+                      {h.text}
+                    </span>
+                  ) : h.kind === "CANCEL" ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Ban className="size-3.5 shrink-0" />
                       {h.text}
                     </span>
                   ) : (

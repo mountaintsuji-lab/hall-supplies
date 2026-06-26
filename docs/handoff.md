@@ -2,7 +2,7 @@
 
 > 作業の引き継ぎ用メモ。**仕様の正**は [`requirements-decisions.md`](./requirements-decisions.md) を参照。
 >
-> 最終更新: 2026-06-12
+> 最終更新: 2026-06-19
 
 ---
 
@@ -46,12 +46,11 @@
 ```powershell
 cd c:\Users\mount\OneDrive\Desktop\src2\hall-supplies
 npm install
-# 初回のみ: Vercel から環境変数を取得（または .env.example を参考に DATABASE_URL を設定）
-npx vercel link --project hall-supplies --yes
-npx vercel env pull .env.local --yes
-# .env に DATABASE_URL をコピー（Prisma CLI 用）
-npm run db:setup   # 初回のみ（migrate + seed）
-npm run dev
+# DATABASE_URL は .env / .env.local（Vercel env pull 可）
+# 認証を有効にする場合（本番推奨）:
+#   AUTH_PASSWORD=現場用  ADMIN_PASSWORD=管理用  AUTH_SECRET=ランダム文字列
+npm run dev          # http://localhost:3000
+npm run db:setup     # 初回のみ（migrate + seed）※全データリセット
 ```
 
 | 環境 | 現数保存 | 備考 |
@@ -83,7 +82,10 @@ npm run dev
 | ファイル | 役割 |
 |----------|------|
 | `src/components/hall-supplies/supplies-main-mockup.tsx` | メイン UI（4ペイン） |
-| `src/app/actions/inventory.ts` | `confirmCount` Server Action |
+| `src/app/actions/inventory.ts` | `confirmCount`, `confirmReceive`, `confirmCancel`, `updateParLevel` |
+| `src/app/actions/auth.ts` | ログイン・ログアウト |
+| `src/lib/auth.ts` / `auth-edge.ts` | セッション・ロール（現場/管理） |
+| `src/middleware.ts` | `AUTH_PASSWORD` 設定時のルート保護 |
 | `src/lib/inventory-queries.ts` | ページデータ取得 |
 | `src/lib/inventory-fallback-data.ts` | `DATABASE_URL` 未設定時のフォールバック |
 | `src/lib/prisma.ts` | Prisma 7 + `@prisma/adapter-pg` |
@@ -106,14 +108,18 @@ npm run dev
 |------|------|
 | 4ペイン UI | ✅ |
 | SKU 現数グリッド・確認モーダル | ✅ |
-| SKU 詳細（現数/定数/発注中） | ✅ |
-| Prisma + Neon Postgres | ✅ |
-| `confirmCount` + InventoryEvent | ✅ COUNT / ORDER |
-| 個体 | 🔶 静的モック |
-| RECEIVE / CANCEL UI | ❌ |
-| 認証・権限 | ❌ |
+| 入庫確定（RECEIVE）UI | ✅ ペイン4緑ボタン・履歴ハイライト・最終入庫バッジ |
+| 名称検索・カテゴリ絞り込み | ✅ ペイン2 |
+| 山手149 SKU | ✅ DB投入済み（消耗品・仮定数10・ID安定化済み） |
+| Prisma + Neon 永続化 | ✅ |
+| DB障害バナー | ✅ |
+| `confirmCount` / `confirmReceive` + InventoryEvent | ✅ COUNT / ORDER / RECEIVE |
+| 個体管理 | 🔶 静的モックのみ |
+| 発注取消（CANCEL）UI | ✅ 管理のみ・ペイン4 |
+| 定数編集 UI | ✅ 管理のみ・ペイン3 |
+| 認証・権限 | ✅ `AUTH_PASSWORD` 設定時（現場/管理ロール） |
+| RECEIVE 部分入庫 | ❌（発注中を一括入庫のみ） |
 | Vercel 本番での永続化 | ✅ 2026-06-12 検証済み |
-| 山手 SKU 実データ（消耗品） | ✅ 149件・仮定数10・ID安定化済み |
 | 本番 DB | Neon `neon-aqua-yacht`（Vercel Storage、pooler URL） |
 
 ---
@@ -122,17 +128,19 @@ npm run dev
 
 ```
 branch: main（origin/main と同期済み）
-未コミット（作業中）:
-  - docs/handoff.md, docs/requirements-decisions.md（第7回ドキュメント整合）
-  - docs/screenshots/, scripts/（本番検証）
-  - package.json（playwright devDep）
 ```
 
 直近コミット:
 
-- `001e845` feat: Neon Postgres へ移行し Vercel 本番で現数を永続化
-- `59b6aa0` docs: 引き継ぎドキュメントを追加し、製品名をポチっとなに変更
-- `0716595` docs: 全体決定一覧を更新
+- `73f3944` feat: 入庫確定（RECEIVE）UIと履歴での見える化
+- `be072ae` feat: 山手消耗品149件のSKUマスタと一覧の検索・カテゴリ絞り込み
+- `5c61cd6` feat: 式場マスタを実名7拠点に差し替え
+
+未コミット（意図的に除外 or 作業外）:
+
+- `docs/screenshots/.../01-before-change.png`（変更のみ）
+- 未追跡: `four-pane-board.tsx`, `inventory-data.ts`（旧デッドコード・コミット不要）
+- 未追跡: `scripts/release-migrate-lock.ts`（運用補助・任意コミット）
 
 ---
 
@@ -140,10 +148,16 @@ branch: main（origin/main と同期済み）
 
 1. ~~本番 DB 接続・永続化確認~~ ✅
 2. ~~山手 SKU 実データ（消耗品・仮定数）~~ ✅
-3. Excel「数」列が埋まったら `npm run import:par-levels -- <xlsmパス>` で定数一括更新
-4. 個体の Prisma 化 + QR スキャン
-5. RECEIVE（入庫確定）UI
-6. 認証・権限（現場 / 管理）
+3. ~~RECEIVE（入庫確定）UI~~ ✅
+4. ~~ドキュメント更新~~ ✅
+5. ~~認証（パスワード + ロール）~~ ✅
+6. ~~CANCEL（発注取消 UI）~~ ✅
+7. ~~定数編集 UI（管理向け）~~ ✅
+8. Excel「数」列が埋まったら `npm run import:par-levels -- <xlsmパス>` で定数一括更新（**2026-06-19: 列未入力のため未実行**）
+9. 備品シート（位牌など56件）— 個体管理フェーズで
+10. 他6拠点の SKU 展開
+11. 個体の Prisma 化 + QR スキャン
+12. RECEIVE 部分入庫
 
 ---
 
